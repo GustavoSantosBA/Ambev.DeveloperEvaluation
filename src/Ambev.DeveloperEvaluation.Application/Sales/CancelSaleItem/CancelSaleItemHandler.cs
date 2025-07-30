@@ -2,6 +2,7 @@ using AutoMapper;
 using MediatR;
 using FluentValidation;
 using Ambev.DeveloperEvaluation.Domain.Repositories;
+using Ambev.DeveloperEvaluation.Domain.Events;
 
 namespace Ambev.DeveloperEvaluation.Application.Sales.CancelSaleItem;
 
@@ -12,18 +13,22 @@ public class CancelSaleItemHandler : IRequestHandler<CancelSaleItemCommand, Canc
 {
     private readonly ISaleRepository _saleRepository;
     private readonly IMapper _mapper;
+    private readonly IPublisher _publisher;
 
     /// <summary>
     /// Initializes a new instance of CancelSaleItemHandler
     /// </summary>
     /// <param name="saleRepository">The sale repository</param>
     /// <param name="mapper">The AutoMapper instance</param>
+    /// <param name="publisher">The MediatR publisher for domain events</param>
     public CancelSaleItemHandler(
         ISaleRepository saleRepository,
-        IMapper mapper)
+        IMapper mapper,
+        IPublisher publisher)
     {
         _saleRepository = saleRepository;
         _mapper = mapper;
+        _publisher = publisher;
     }
 
     /// <summary>
@@ -54,7 +59,7 @@ public class CancelSaleItemHandler : IRequestHandler<CancelSaleItemCommand, Canc
         if (itemToCancel == null)
             throw new KeyNotFoundException($"Product with ID {request.ProductId} not found in sale or already cancelled");
 
-        // Store item details before cancellation for the result
+        // Store item details before cancellation for the result and event
         var cancelledQuantity = itemToCancel.Quantity;
         var cancelledAmount = itemToCancel.Total;
         var productName = itemToCancel.ProductName;
@@ -64,6 +69,9 @@ public class CancelSaleItemHandler : IRequestHandler<CancelSaleItemCommand, Canc
 
         // Update the sale in the repository
         var updatedSale = await _saleRepository.UpdateAsync(sale, cancellationToken);
+
+        // Publish domain event
+        await _publisher.Publish(new ItemCancelledEvent(updatedSale, itemToCancel, cancelledQuantity, cancelledAmount), cancellationToken);
 
         // Create and populate the result
         var result = _mapper.Map<CancelSaleItemResult>(updatedSale);
