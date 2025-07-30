@@ -123,6 +123,80 @@ public class SaleRepository : ISaleRepository
     }
 
     /// <summary>
+    /// Retrieves sales with advanced filtering and pagination
+    /// </summary>
+    /// <param name="page">Page number (starting from 1)</param>
+    /// <param name="pageSize">Number of items per page</param>
+    /// <param name="customerId">Optional customer ID filter</param>
+    /// <param name="branchId">Optional branch ID filter</param>
+    /// <param name="startDate">Optional start date filter</param>
+    /// <param name="endDate">Optional end date filter</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Collection of filtered sales for the specified page</returns>
+    public async Task<IEnumerable<Sale>> GetFilteredAsync(
+        int page = 1,
+        int pageSize = 10,
+        Guid? customerId = null,
+        Guid? branchId = null,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _context.Sales.Include(s => s.Items).AsQueryable();
+
+        if (customerId.HasValue)
+            query = query.Where(s => s.CustomerId == customerId.Value);
+
+        if (branchId.HasValue)
+            query = query.Where(s => s.BranchId == branchId.Value);
+
+        if (startDate.HasValue)
+            query = query.Where(s => s.SaleDate >= startDate.Value);
+
+        if (endDate.HasValue)
+            query = query.Where(s => s.SaleDate <= endDate.Value);
+
+        return await query
+            .OrderByDescending(s => s.SaleDate)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Gets the count of sales matching the specified filters
+    /// </summary>
+    /// <param name="customerId">Optional customer ID filter</param>
+    /// <param name="branchId">Optional branch ID filter</param>
+    /// <param name="startDate">Optional start date filter</param>
+    /// <param name="endDate">Optional end date filter</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Total count of filtered sales</returns>
+    public async Task<int> GetFilteredCountAsync(
+        Guid? customerId = null,
+        Guid? branchId = null,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _context.Sales.AsQueryable();
+
+        if (customerId.HasValue)
+            query = query.Where(s => s.CustomerId == customerId.Value);
+
+        if (branchId.HasValue)
+            query = query.Where(s => s.BranchId == branchId.Value);
+
+        if (startDate.HasValue)
+            query = query.Where(s => s.SaleDate >= startDate.Value);
+
+        if (endDate.HasValue)
+            query = query.Where(s => s.SaleDate <= endDate.Value);
+
+        return await query.CountAsync(cancellationToken);
+    }
+
+    /// <summary>
     /// Updates an existing sale in the database
     /// </summary>
     /// <param name="sale">The sale to update</param>
