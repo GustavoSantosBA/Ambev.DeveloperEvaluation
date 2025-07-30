@@ -7,8 +7,13 @@ public static class DependencyResolver
 {
     public static void RegisterDependencies(this WebApplicationBuilder builder)
     {
+        // Core modules
         new ApplicationModuleInitializer().Initialize(builder);
         new InfrastructureModuleInitializer().Initialize(builder);
         new WebApiModuleInitializer().Initialize(builder);
+        
+        // Sales modules
+        new SalesModuleInitializer().Initialize(builder);
+        new WebApiSalesModuleInitializer().Initialize(builder);
     }
 }
