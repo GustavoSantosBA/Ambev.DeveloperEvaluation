@@ -38,10 +38,15 @@ public class Program
 
             builder.Services.AddJwtAuthentication(builder.Configuration);
 
+            // Register all dependencies including Sales
             builder.RegisterDependencies();
 
-            builder.Services.AddAutoMapper(typeof(Program).Assembly, typeof(ApplicationLayer).Assembly);
+            // AutoMapper configuration - will automatically discover all profiles
+            builder.Services.AddAutoMapper(
+                typeof(Program).Assembly, 
+                typeof(ApplicationLayer).Assembly);
 
+            // MediatR configuration - will automatically discover all handlers
             builder.Services.AddMediatR(cfg =>
             {
                 cfg.RegisterServicesFromAssemblies(
