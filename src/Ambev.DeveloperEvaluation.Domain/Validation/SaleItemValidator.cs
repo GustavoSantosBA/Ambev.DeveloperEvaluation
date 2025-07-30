@@ -1,3 +1,4 @@
+using Ambev.DeveloperEvaluation.Domain.Constants;
 using Ambev.DeveloperEvaluation.Domain.Entities;
 using FluentValidation;
 
@@ -23,8 +24,8 @@ public class SaleItemValidator : AbstractValidator<SaleItem>
         RuleFor(item => item.Quantity)
             .GreaterThan(0)
             .WithMessage("Quantity must be greater than zero")
-            .LessThanOrEqualTo(20)
-            .WithMessage("Cannot sell above 20 identical items");
+            .LessThanOrEqualTo(SaleBusinessRules.MaxQuantityPerItem)
+            .WithMessage($"Cannot sell above {SaleBusinessRules.MaxQuantityPerItem} identical items");
 
         RuleFor(item => item.UnitPrice)
             .GreaterThan(0)
@@ -36,10 +37,10 @@ public class SaleItemValidator : AbstractValidator<SaleItem>
             .LessThanOrEqualTo(100)
             .WithMessage("Discount cannot exceed 100%");
 
-        // Business rule: No discount for quantities below 4
+        // Business rule: No discount for quantities below minimum
         RuleFor(item => item)
-            .Must(item => item.Quantity >= 4 || item.Discount == 0)
-            .WithMessage("Purchases below 4 items cannot have a discount");
+            .Must(item => item.Quantity >= SaleBusinessRules.MinQuantityForDiscount || item.Discount == 0)
+            .WithMessage($"Purchases below {SaleBusinessRules.MinQuantityForDiscount} items cannot have a discount");
 
         RuleFor(item => item.Total)
             .GreaterThanOrEqualTo(0)

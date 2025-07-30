@@ -14,6 +14,7 @@ using Ambev.DeveloperEvaluation.Application.Sales.GetSales;
 using Ambev.DeveloperEvaluation.Application.Sales.UpdateSale;
 using Ambev.DeveloperEvaluation.Application.Sales.CancelSale;
 using Ambev.DeveloperEvaluation.Application.Sales.CancelSaleItem;
+using Ambev.DeveloperEvaluation.WebApi.Filters;
 
 namespace Ambev.DeveloperEvaluation.WebApi.Features.Sales;
 
@@ -49,11 +50,10 @@ public class SalesController : BaseController
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateSale([FromBody] CreateSaleRequest request, CancellationToken cancellationToken)
     {
-        var validator = new CreateSaleRequestValidator();
-        var validationResult = await validator.ValidateAsync(request, cancellationToken);
-
-        if (!validationResult.IsValid)
-            return BadRequest(validationResult.Errors);
+        // Use helper method to reduce duplication
+        var validationError = await ValidationActionFilter.ValidateRequest(request, cancellationToken);
+        if (validationError != null)
+            return validationError;
 
         var command = _mapper.Map<CreateSaleCommand>(request);
         var response = await _mediator.Send(command, cancellationToken);
@@ -144,7 +144,7 @@ public class SalesController : BaseController
             return BadRequest(validationResult.Errors);
 
         var command = _mapper.Map<UpdateSaleCommand>(request);
-        command = command with { Id = id }; // Set the ID from route
+        command.Id = id; // Set the ID from route
 
         var response = await _mediator.Send(command, cancellationToken);
 

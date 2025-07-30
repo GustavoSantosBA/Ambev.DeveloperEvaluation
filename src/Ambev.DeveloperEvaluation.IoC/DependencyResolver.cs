@@ -12,8 +12,10 @@ public static class DependencyResolver
         new InfrastructureModuleInitializer().Initialize(builder);
         new WebApiModuleInitializer().Initialize(builder);
         
-        // Sales modules
+        // Sales module
         new SalesModuleInitializer().Initialize(builder);
-        new WebApiSalesModuleInitializer().Initialize(builder);
+        
+        // Removed WebApiSalesModuleInitializer as it's not needed
+        // AutoMapper and validators are discovered automatically
     }
 }

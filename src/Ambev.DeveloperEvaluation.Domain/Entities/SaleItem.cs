@@ -1,5 +1,7 @@
 using Ambev.DeveloperEvaluation.Common.Validation;
+using Ambev.DeveloperEvaluation.Domain.Common;
 using Ambev.DeveloperEvaluation.Domain.Validation;
+using Ambev.DeveloperEvaluation.Domain.Constants;
 
 namespace Ambev.DeveloperEvaluation.Domain.Entities;
 
@@ -7,7 +9,7 @@ namespace Ambev.DeveloperEvaluation.Domain.Entities;
 /// Represents an individual item within a sale.
 /// Contains product information and pricing details with business rule validation.
 /// </summary>
-public class SaleItem
+public class SaleItem : BaseEntity
 {
     /// <summary>
     /// Gets or sets the product external identifier (External Identities pattern)
@@ -69,40 +71,46 @@ public class SaleItem
     }
 
     /// <summary>
-    /// Applies business rules for quantity-based discounts
-    /// Business Rules:
-    /// - Purchases above 4 identical items have a 10% discount
-    /// - Purchases between 10 and 20 identical items have a 20% discount
-    /// - It's not possible to sell above 20 identical items
-    /// - Purchases below 4 items cannot have a discount
+    /// Applies business rules for quantity-based discounts using constants
     /// </summary>
-    /// <exception cref="InvalidOperationException">Thrown when trying to sell more than 20 items</exception>
+    /// <exception cref="InvalidOperationException">Thrown when trying to sell more than maximum allowed items</exception>
     public void ApplyDiscountRules()
     {
-        // Business rule: Maximum 20 items per product
-        if (Quantity > 20)
-        {
-            throw new InvalidOperationException("It's not possible to sell above 20 identical items");
-        }
+        ValidateMaxQuantity();
+        ApplyQuantityBasedDiscount();
+        CalculateTotal();
+    }
 
-        // Apply discount based on quantity
-        if (Quantity < 4)
+    /// <summary>
+    /// Validates maximum quantity business rule
+    /// </summary>
+    private void ValidateMaxQuantity()
+    {
+        if (Quantity > SaleBusinessRules.MaxQuantityPerItem)
         {
-            // Business rule: No discount for less than 4 items
+            throw new InvalidOperationException(
+                $"It's not possible to sell above {SaleBusinessRules.MaxQuantityPerItem} identical items");
+        }
+    }
+
+    /// <summary>
+    /// Applies quantity-based discount rules
+    /// </summary>
+    private void ApplyQuantityBasedDiscount()
+    {
+        if (Quantity < SaleBusinessRules.MinQuantityForDiscount)
+        {
             Discount = 0;
         }
-        else if (Quantity >= 4 && Quantity < 10)
+        else if (Quantity >= SaleBusinessRules.MinQuantityForDiscount &&
+                 Quantity < SaleBusinessRules.MinQuantityForHigherDiscount)
         {
-            // Business rule: 10% discount for 4-9 items
-            Discount = 10;
+            Discount = SaleBusinessRules.StandardDiscountPercentage;
         }
-        else if (Quantity >= 10 && Quantity <= 20)
+        else if (Quantity >= SaleBusinessRules.MinQuantityForHigherDiscount)
         {
-            // Business rule: 20% discount for 10-20 items
-            Discount = 20;
+            Discount = SaleBusinessRules.HighDiscountPercentage;
         }
-
-        CalculateTotal();
     }
 
     /// <summary>
