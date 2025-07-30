@@ -5,7 +5,10 @@ using Microsoft.Extensions.Logging;
 namespace Ambev.DeveloperEvaluation.Application.Sales.Events;
 
 /// <summary>
-/// Handler for SaleModifiedEvent that logs the sale modification
+/// Handler for SaleModifiedEvent that logs sale modifications with change tracking
+/// Handler for SaleModifiedEvent that logs sale modifications with change tracking
+/// Handler for SaleModifiedEvent that logs sale modifications with change tracking
+/// Handler for SaleModifiedEvent that logs sale modifications with change tracking
 /// </summary>
 public class SaleModifiedEventHandler : INotificationHandler<SaleModifiedEvent>
 {
