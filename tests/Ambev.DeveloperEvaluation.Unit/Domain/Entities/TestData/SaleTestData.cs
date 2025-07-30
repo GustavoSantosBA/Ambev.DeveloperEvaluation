@@ -122,4 +122,51 @@ public static class SaleTestData
         sale.Cancel();
         return sale;
     }
+
+    /// <summary>
+    /// Generates a SaleItem with invalid product name for testing validation.
+    /// </summary>
+    /// <returns>A SaleItem with invalid product name.</returns>
+    public static SaleItem GenerateSaleItemWithInvalidProductName()
+    {
+        var item = SaleItemFaker.Generate();
+        item.ProductName = string.Empty;
+        return item;
+    }
+
+    /// <summary>
+    /// Generates a SaleItem with invalid discount for quantity for testing validation.
+    /// </summary>
+    /// <returns>A SaleItem with invalid discount rules.</returns>
+    public static SaleItem GenerateSaleItemWithInvalidDiscountRule()
+    {
+        var item = SaleItemFaker.Generate();
+        item.Quantity = 2; // Below minimum for discount
+        item.Discount = 10; // Has discount anyway
+        return item;
+    }
+
+    /// <summary>
+    /// Generates a Sale with future date for testing validation.
+    /// </summary>
+    /// <returns>A Sale with future date.</returns>
+    public static Sale GenerateSaleWithFutureDate()
+    {
+        var sale = SaleFaker.Generate();
+        sale.SaleDate = DateTime.UtcNow.AddDays(1);
+        return sale;
+    }
+
+    /// <summary>
+    /// Generates a Sale with long names for testing validation.
+    /// </summary>
+    /// <returns>A Sale with names exceeding maximum length.</returns>
+    public static Sale GenerateSaleWithLongNames()
+    {
+        var sale = SaleFaker.Generate();
+        sale.CustomerName = new string('A', 101);
+        sale.BranchName = new string('B', 101);
+        sale.SaleNumber = new string('C', 51);
+        return sale;
+    }
 }
