@@ -3,8 +3,15 @@ using Microsoft.AspNetCore.Builder;
 
 namespace Ambev.DeveloperEvaluation.IoC;
 
+/// <summary>
+/// Extension methods for dependency injection setup
+/// </summary>
 public static class DependencyResolver
 {
+    /// <summary>
+    /// Registers all application dependencies
+    /// </summary>
+    /// <param name="builder">The web application builder</param>
     public static void RegisterDependencies(this WebApplicationBuilder builder)
     {
         // Core modules

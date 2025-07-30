@@ -15,7 +15,7 @@ public static class SaleRepositoryTestData
     /// </summary>
     private static readonly Faker<Sale> SaleFaker = new Faker<Sale>()
         .RuleFor(s => s.SaleNumber, f => f.Random.AlphaNumeric(10))
-        .RuleFor(s => s.SaleDate, f => f.Date.Recent(30))
+        .RuleFor(s => s.SaleDate, f => f.Date.Past(30)) // Usar Past ao invés de Recent para evitar datas futuras
         .RuleFor(s => s.CustomerId, f => f.Random.Guid())
         .RuleFor(s => s.CustomerName, f => f.Company.CompanyName())
         .RuleFor(s => s.BranchId, f => f.Random.Guid())
@@ -34,11 +34,8 @@ public static class SaleRepositoryTestData
         .RuleFor(si => si.Quantity, f => f.Random.Int(1, SaleBusinessRules.MaxQuantityPerItem))
         .RuleFor(si => si.UnitPrice, f => f.Random.Decimal(1, 100))
         .RuleFor(si => si.Discount, f => 0)
-        .RuleFor(si => si.IsCancelled, f => false)
-        .FinishWith((f, si) => 
-        {
-            si.ApplyDiscountRules();
-        });
+        .RuleFor(si => si.IsCancelled, f => false);
+        // Remover o FinishWith que estava causando problemas
 
     /// <summary>
     /// Generates a valid Sale entity with items for repository testing.
@@ -46,13 +43,27 @@ public static class SaleRepositoryTestData
     public static Sale GenerateValidSaleWithItems(int itemCount = 2)
     {
         var sale = SaleFaker.Generate();
+        
+        // Garantir que a coleção Items está inicializada
+        if (sale.Items == null)
+        {
+            sale.Items = new List<SaleItem>();
+        }
+        else
+        {
+            sale.Items.Clear();
+        }
+        
         var items = SaleItemFaker.Generate(itemCount);
         
         foreach (var item in items)
         {
+            // Aplicar regras de desconto antes de adicionar
+            item.ApplyDiscountRules();
             sale.Items.Add(item);
         }
         
+        // Recalcular total após adicionar todos os itens
         sale.CalculateTotalAmount();
         return sale;
     }
@@ -67,7 +78,7 @@ public static class SaleRepositoryTestData
         for (int i = 0; i < saleCount; i++)
         {
             var sale = GenerateValidSaleWithItems(itemsPerSale);
-            sale.SaleNumber = $"BULK-{i:D5}";
+            sale.SaleNumber = $"BULK-{i:D5}"; // Garantir números únicos
             sales.Add(sale);
         }
         

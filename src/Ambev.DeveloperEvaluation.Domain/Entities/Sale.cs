@@ -57,7 +57,7 @@ public class Sale : BaseEntity
     /// <summary>
     /// Gets or sets the collection of items in this sale
     /// </summary>
-    public List<SaleItem> Items { get; set; } = new();
+    public List<SaleItem> Items { get; set; }
 
     /// <summary>
     /// Gets or sets the creation timestamp
@@ -77,6 +77,7 @@ public class Sale : BaseEntity
         CreatedAt = DateTime.UtcNow;
         Status = SaleStatus.Active;
         SaleDate = DateTime.UtcNow;
+        Items = new List<SaleItem>(); // Garantir inicialização
     }
 
     /// <summary>
@@ -108,6 +109,12 @@ public class Sale : BaseEntity
     /// </summary>
     public void CalculateTotalAmount()
     {
+        // Verificação de segurança para evitar NullReferenceException
+        if (Items == null)
+        {
+            Items = new List<SaleItem>();
+        }
+        
         TotalAmount = Items.Where(item => !item.IsCancelled).Sum(item => item.Total);
         UpdatedAt = DateTime.UtcNow;
     }
@@ -119,6 +126,17 @@ public class Sale : BaseEntity
     /// <exception cref="InvalidOperationException">Thrown when business rules are violated</exception>
     public void AddItem(SaleItem item)
     {
+        // Verificação de segurança
+        if (Items == null)
+        {
+            Items = new List<SaleItem>();
+        }
+        
+        if (item == null)
+        {
+            throw new ArgumentNullException(nameof(item));
+        }
+        
         // Business rule validation is handled in SaleItem.ApplyDiscountRules()
         item.ApplyDiscountRules();
         Items.Add(item);
@@ -133,6 +151,13 @@ public class Sale : BaseEntity
     /// <param name="newUnitPrice">The new unit price</param>
     public void ModifyItem(Guid productId, int newQuantity, decimal newUnitPrice)
     {
+        // Verificação de segurança
+        if (Items == null)
+        {
+            Items = new List<SaleItem>();
+            return;
+        }
+        
         var item = Items.FirstOrDefault(i => i.ProductId == productId && !i.IsCancelled);
         if (item != null)
         {
@@ -149,6 +174,13 @@ public class Sale : BaseEntity
     /// <param name="productId">The product ID to cancel</param>
     public void CancelItem(Guid productId)
     {
+        // Verificação de segurança
+        if (Items == null)
+        {
+            Items = new List<SaleItem>();
+            return;
+        }
+        
         var item = Items.FirstOrDefault(i => i.ProductId == productId && !i.IsCancelled);
         if (item != null)
         {

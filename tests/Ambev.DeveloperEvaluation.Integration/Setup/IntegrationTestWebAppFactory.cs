@@ -1,16 +1,19 @@
 using Ambev.DeveloperEvaluation.ORM;
+using Ambev.DeveloperEvaluation.WebApi;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Testcontainers.PostgreSql;
+using Xunit;
 
 namespace Ambev.DeveloperEvaluation.Integration.Setup;
 
 /// <summary>
-/// Custom WebApplicationFactory for integration tests with test database setup
+/// Custom WebApplicationFactory for integration tests with test database setup  
 /// </summary>
 public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
@@ -92,7 +95,7 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
     /// </summary>
     public IServiceScope CreateScope()
     {
-        return Services.CreateScope();
+        return base.Services.CreateScope();
     }
 
     /// <summary>

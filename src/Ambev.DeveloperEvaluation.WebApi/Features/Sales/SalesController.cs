@@ -27,16 +27,19 @@ public class SalesController : BaseController
 {
     private readonly IMediator _mediator;
     private readonly IMapper _mapper;
+    private readonly IServiceProvider _serviceProvider;
 
     /// <summary>
     /// Initializes a new instance of SalesController
     /// </summary>
     /// <param name="mediator">The mediator instance</param>
     /// <param name="mapper">The AutoMapper instance</param>
-    public SalesController(IMediator mediator, IMapper mapper)
+    /// <param name="serviceProvider">The service provider instance</param>
+    public SalesController(IMediator mediator, IMapper mapper, IServiceProvider serviceProvider)
     {
         _mediator = mediator;
         _mapper = mapper;
+        _serviceProvider = serviceProvider;
     }
 
     /// <summary>
@@ -51,7 +54,7 @@ public class SalesController : BaseController
     public async Task<IActionResult> CreateSale([FromBody] CreateSaleRequest request, CancellationToken cancellationToken)
     {
         // Use helper method to reduce duplication
-        var validationError = await ValidationActionFilter.ValidateRequest(request, cancellationToken);
+        var validationError = await ValidationActionFilter.ValidateRequest(request, _serviceProvider, cancellationToken);
         if (validationError != null)
             return validationError;
 

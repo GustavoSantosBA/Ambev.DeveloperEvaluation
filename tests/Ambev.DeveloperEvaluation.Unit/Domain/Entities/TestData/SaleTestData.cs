@@ -17,7 +17,7 @@ public static class SaleTestData
     /// </summary>
     private static readonly Faker<Sale> SaleFaker = new Faker<Sale>()
         .RuleFor(s => s.SaleNumber, f => f.Random.AlphaNumeric(10))
-        .RuleFor(s => s.SaleDate, f => f.Date.Recent(30))
+        .RuleFor(s => s.SaleDate, f => f.Date.Past(30)) // Mudou de Recent para Past para garantir datas passadas
         .RuleFor(s => s.CustomerId, f => f.Random.Guid())
         .RuleFor(s => s.CustomerName, f => f.Company.CompanyName())
         .RuleFor(s => s.BranchId, f => f.Random.Guid())

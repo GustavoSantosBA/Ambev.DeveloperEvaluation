@@ -11,6 +11,13 @@ namespace Ambev.DeveloperEvaluation.WebApi.Filters;
 /// </summary>
 public class ValidationActionFilter : IAsyncActionFilter
 {
+    private readonly IServiceProvider _serviceProvider;
+
+    public ValidationActionFilter(IServiceProvider serviceProvider)
+    {
+        _serviceProvider = serviceProvider;
+    }
+
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
         // Continue normal execution if no validation errors
@@ -20,18 +27,19 @@ public class ValidationActionFilter : IAsyncActionFilter
     /// <summary>
     /// Helper method to validate request objects
     /// </summary>
-    public static async Task<IActionResult?> ValidateRequest<T>(T request, CancellationToken cancellationToken)
+    public static async Task<IActionResult?> ValidateRequest<T>(T request, IServiceProvider serviceProvider, CancellationToken cancellationToken)
         where T : class
     {
-        var validatorType = typeof(IValidator<>).MakeGenericType(typeof(T));
-
-        if (Activator.CreateInstance(validatorType) is not IValidator validator)
+        // Try to get validator from DI container
+        var validator = serviceProvider.GetService<IValidator<T>>();
+        
+        if (validator == null)
         {
+            // If no validator is registered, skip validation
             return null;
         }
 
-        var validationContext = new ValidationContext<T>(request);
-        var validationResult = await validator.ValidateAsync(validationContext, cancellationToken);
+        var validationResult = await validator.ValidateAsync(request, cancellationToken);
 
         if (!validationResult.IsValid)
         {
