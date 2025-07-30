@@ -144,7 +144,7 @@ public class SalesController : BaseController
             return BadRequest(validationResult.Errors);
 
         var command = _mapper.Map<UpdateSaleCommand>(request);
-        command = command with { Id = id }; // Set the ID from route
+        command.Id = id; // Set the ID from route
 
         var response = await _mediator.Send(command, cancellationToken);
 

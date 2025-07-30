@@ -1,17 +1,12 @@
-using Ambev.DeveloperEvaluation.WebApi.Features.Sales;
-using Ambev.DeveloperEvaluation.WebApi.Features.Sales.CreateSale;
-using Ambev.DeveloperEvaluation.WebApi.Features.Sales.GetSale;
-using Ambev.DeveloperEvaluation.WebApi.Features.Sales.GetSales;
-using Ambev.DeveloperEvaluation.WebApi.Features.Sales.UpdateSale;
-using Ambev.DeveloperEvaluation.WebApi.Features.Sales.CancelSale;
-using Ambev.DeveloperEvaluation.WebApi.Features.Sales.CancelSaleItem;
+using Ambev.DeveloperEvaluation.IoC;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Ambev.DeveloperEvaluation.IoC.ModuleInitializers;
 
 /// <summary>
 /// Module initializer for Sales WebApi-related dependencies
+/// This module is currently empty as AutoMapper profiles and validators
+/// are automatically discovered by the framework in Program.cs
 /// </summary>
 public class WebApiSalesModuleInitializer : IModuleInitializer
 {
@@ -21,37 +16,8 @@ public class WebApiSalesModuleInitializer : IModuleInitializer
     /// <param name="builder">The web application builder</param>
     public void Initialize(WebApplicationBuilder builder)
     {
-        RegisterApiProfiles(builder);
-        RegisterApiValidators(builder);
-    }
-
-    /// <summary>
-    /// Registers AutoMapper profiles for Sales API layer
-    /// </summary>
-    private static void RegisterApiProfiles(WebApplicationBuilder builder)
-    {
-        builder.Services.AddAutoMapper(typeof(SalesApiProfile));
-    }
-
-    /// <summary>
-    /// Registers Sales API request validators
-    /// </summary>
-    private static void RegisterApiValidators(WebApplicationBuilder builder)
-    {
-        // Create Sale validators
-        builder.Services.AddScoped<CreateSaleRequestValidator>();
-        builder.Services.AddScoped<CreateSaleItemRequestValidator>();
-        
-        // Get Sale validators
-        builder.Services.AddScoped<GetSaleRequestValidator>();
-        builder.Services.AddScoped<GetSalesRequestValidator>();
-        
-        // Update Sale validators
-        builder.Services.AddScoped<UpdateSaleRequestValidator>();
-        builder.Services.AddScoped<UpdateSaleItemRequestValidator>();
-        
-        // Cancel Sale validators
-        builder.Services.AddScoped<CancelSaleRequestValidator>();
-        builder.Services.AddScoped<CancelSaleItemRequestValidator>();
+        // No explicit registrations needed
+        // AutoMapper profiles are discovered automatically by AddAutoMapper() in Program.cs
+        // Request validators are used directly in controllers without DI registration
     }
 }

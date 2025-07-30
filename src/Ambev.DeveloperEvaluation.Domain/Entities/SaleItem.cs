@@ -1,4 +1,5 @@
 using Ambev.DeveloperEvaluation.Common.Validation;
+using Ambev.DeveloperEvaluation.Domain.Common;
 using Ambev.DeveloperEvaluation.Domain.Validation;
 
 namespace Ambev.DeveloperEvaluation.Domain.Entities;
@@ -7,7 +8,7 @@ namespace Ambev.DeveloperEvaluation.Domain.Entities;
 /// Represents an individual item within a sale.
 /// Contains product information and pricing details with business rule validation.
 /// </summary>
-public class SaleItem
+public class SaleItem : BaseEntity
 {
     /// <summary>
     /// Gets or sets the product external identifier (External Identities pattern)
