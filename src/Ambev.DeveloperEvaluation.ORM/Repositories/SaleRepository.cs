@@ -17,7 +17,8 @@ public class SaleRepository : ISaleRepository
     /// <param name="context">The database context</param>
     public SaleRepository(DefaultContext context)
     {
-        _context = context;
+        // FIX: Ensure the context is not null.
+        _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
     /// <summary>
@@ -28,6 +29,14 @@ public class SaleRepository : ISaleRepository
     /// <returns>The created sale</returns>
     public async Task<Sale> CreateAsync(Sale sale, CancellationToken cancellationToken = default)
     {
+        // FIX: Check if the sale object is null before using it.
+        if (sale == null)
+        {
+            throw new ArgumentNullException(nameof(sale));
+        }
+
+        // The error is likely happening on the next line if _context.Sales is null,
+        // but this is very unlikely if the context is injected correctly.
         await _context.Sales.AddAsync(sale, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
         return sale;

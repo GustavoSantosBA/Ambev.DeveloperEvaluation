@@ -1,11 +1,14 @@
 using Ambev.DeveloperEvaluation.ORM;
+using Ambev.DeveloperEvaluation.WebApi;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Testcontainers.PostgreSql;
+using Xunit;
 
 namespace Ambev.DeveloperEvaluation.Functional.Setup;
 
@@ -32,11 +35,17 @@ public class FunctionalTestWebAppFactory : WebApplicationFactory<Program>, IAsyn
     /// </summary>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.UseEnvironment("FunctionalTesting");
+        
         builder.ConfigureAppConfiguration((context, config) =>
         {
-            config.AddJsonFile("appsettings.Functional.json", optional: false, reloadOnChange: true);
+            config.AddJsonFile("appsettings.Functional.json", optional: true, reloadOnChange: true);
+            config.AddInMemoryCollection(new[]
+            {
+                new KeyValuePair<string, string>("ConnectionStrings:DefaultConnection", ConnectionString)
+            });
         });
-
+        
         builder.ConfigureServices(services =>
         {
             // Remove the existing DbContext registration
@@ -57,8 +66,6 @@ public class FunctionalTestWebAppFactory : WebApplicationFactory<Program>, IAsyn
             var context = scope.ServiceProvider.GetRequiredService<DefaultContext>();
             context.Database.Migrate();
         });
-
-        builder.UseEnvironment("FunctionalTesting");
         
         // Configure logging for functional tests
         builder.ConfigureLogging(logging =>

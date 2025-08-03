@@ -64,10 +64,10 @@ public class CancelSaleItemHandler : IRequestHandler<CancelSaleItemCommand, Canc
         var cancelledAmount = itemToCancel.Total;
         var productName = itemToCancel.ProductName;
 
-        // Cancel the item using domain method
+        // Cancel the item using domain method - this will update TotalAmount
         sale.CancelItem(request.ProductId);
 
-        // Update the sale in the repository
+        // Explicitly mark the entity as modified to ensure EF tracks the changes
         var updatedSale = await _saleRepository.UpdateAsync(sale, cancellationToken);
 
         // Publish domain event

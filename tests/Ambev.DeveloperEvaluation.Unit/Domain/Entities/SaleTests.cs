@@ -44,7 +44,8 @@ public class SaleTests
     public void Given_ValidSale_When_Validated_Then_ShouldBeValid()
     {
         // Arrange
-        var sale = SaleTestData.GenerateValidSale();
+        // Usar GenerateValidSaleWithItems ao invés de GenerateValidSale para incluir itens necessários
+        var sale = SaleTestData.GenerateValidSaleWithItems(2);
 
         // Act
         var result = sale.Validate();
@@ -82,7 +83,7 @@ public class SaleTests
     public void Given_ActiveSale_When_Cancelled_Then_ShouldUpdateStatusAndTimestamp()
     {
         // Arrange
-        var sale = SaleTestData.GenerateValidSale();
+        var sale = SaleTestData.GenerateValidSaleWithItems(1);
         var originalUpdateTime = sale.UpdatedAt;
 
         // Act
@@ -105,6 +106,7 @@ public class SaleTests
     public void Given_EmptySale_When_ItemAdded_Then_ShouldAddItemAndCalculateTotal()
     {
         // Arrange
+        // Para este teste, usar GenerateValidSale é apropriado pois queremos uma venda vazia para testar a adição
         var sale = SaleTestData.GenerateValidSale();
         var item = SaleTestData.GenerateValidSaleItem();
 

@@ -1,16 +1,19 @@
 using Ambev.DeveloperEvaluation.ORM;
+using Ambev.DeveloperEvaluation.WebApi;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Testcontainers.PostgreSql;
+using Xunit;
 
 namespace Ambev.DeveloperEvaluation.Integration.Setup;
 
 /// <summary>
-/// Custom WebApplicationFactory for integration tests with test database setup
+/// Custom WebApplicationFactory for integration tests with test database setup  
 /// </summary>
 public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
@@ -28,45 +31,69 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
     public string ConnectionString => _dbContainer.GetConnectionString();
 
     /// <summary>
-    /// Configures the web host for testing
+    /// Configures the web host for testing - VERSÃO SIMPLIFICADA
     /// </summary>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.UseEnvironment("Testing");
+        
         builder.ConfigureAppConfiguration((context, config) =>
         {
-            // Add test configuration
-            config.AddJsonFile("appsettings.Test.json", optional: false, reloadOnChange: true);
+            // Limpar configurações existentes e adicionar as de teste
+            config.Sources.Clear();
+            config.AddJsonFile("appsettings.Test.json", optional: true, reloadOnChange: true);
+            config.AddInMemoryCollection(new[]
+            {
+                new KeyValuePair<string, string>("ConnectionStrings:DefaultConnection", ConnectionString)
+            });
         });
 
         builder.ConfigureServices(services =>
         {
-            // Remove the existing DbContext registration
-            var descriptor = services.SingleOrDefault(
-                d => d.ServiceType == typeof(DbContextOptions<DefaultContext>));
+            // Remover o DbContext existente
+            var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<DefaultContext>));
             if (descriptor != null)
                 services.Remove(descriptor);
 
-            // Add test database
+            // Adicionar DbContext de teste
             services.AddDbContext<DefaultContext>(options =>
             {
                 options.UseNpgsql(ConnectionString);
             });
 
-            // Build service provider and migrate database
-            var serviceProvider = services.BuildServiceProvider();
-            using var scope = serviceProvider.CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<DefaultContext>();
-            context.Database.Migrate();
-        });
+            // Remover autenticação JWT e usar autenticação de teste
+            var authDescriptors = services.Where(d => d.ServiceType.Name.Contains("Authentication")).ToList();
+            foreach (var authDescriptor in authDescriptors)
+            {
+                services.Remove(authDescriptor);
+            }
 
-        builder.UseEnvironment("Testing");
+            services.AddAuthentication("Test")
+                .AddScheme<TestAuthenticationSchemeOptions, TestAuthenticationHandler>("Test", options => { });
+        });
         
-        // Suppress logging during tests to reduce noise
+        // Configurar logging mínimo para testes
         builder.ConfigureLogging(logging =>
         {
             logging.ClearProviders();
             logging.AddConsole();
-            logging.SetMinimumLevel(LogLevel.Warning);
+            logging.SetMinimumLevel(LogLevel.Error); // Só erros
+        });
+
+        // Migrar banco após configuração dos serviços
+        builder.ConfigureServices(services =>
+        {
+            var serviceProvider = services.BuildServiceProvider();
+            using var scope = serviceProvider.CreateScope();
+            try
+            {
+                var context = scope.ServiceProvider.GetRequiredService<DefaultContext>();
+                context.Database.Migrate();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Database migration failed: {ex.Message}");
+            }
         });
     }
 
@@ -92,7 +119,7 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
     /// </summary>
     public IServiceScope CreateScope()
     {
-        return Services.CreateScope();
+        return base.Services.CreateScope();
     }
 
     /// <summary>

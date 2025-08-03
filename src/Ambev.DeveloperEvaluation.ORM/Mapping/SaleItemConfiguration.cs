@@ -15,7 +15,7 @@ public class SaleItemConfiguration : IEntityTypeConfiguration<SaleItem>
             .HasColumnType("uuid")
             .HasDefaultValueSql("gen_random_uuid()");
 
-        builder.Property<Guid>("SaleId")
+        builder.Property(si => si.SaleId)
             .IsRequired()
             .HasColumnType("uuid");
 
@@ -50,7 +50,7 @@ public class SaleItemConfiguration : IEntityTypeConfiguration<SaleItem>
 
         // Indexes for performance
         builder.HasIndex(si => si.ProductId);
-        builder.HasIndex("SaleId");
+        builder.HasIndex(si => si.SaleId);
         builder.HasIndex(si => si.IsCancelled);
 
         // Constraints

@@ -50,7 +50,21 @@ public class SalesApiProfile : Profile
         CreateMap<Guid, GetSaleQuery>()
             .ConstructUsing(id => new GetSaleQuery(id));
         
-        CreateMap<GetSaleResult, GetSaleResponse>();
+        // CRITICAL FIX: Explicit mapping for all properties
+        CreateMap<GetSaleResult, GetSaleResponse>()
+            .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Id))
+            .ForMember(dest => dest.SaleNumber, opt => opt.MapFrom(src => src.SaleNumber))
+            .ForMember(dest => dest.SaleDate, opt => opt.MapFrom(src => src.SaleDate))
+            .ForMember(dest => dest.CustomerId, opt => opt.MapFrom(src => src.CustomerId))
+            .ForMember(dest => dest.CustomerName, opt => opt.MapFrom(src => src.CustomerName))
+            .ForMember(dest => dest.BranchId, opt => opt.MapFrom(src => src.BranchId))
+            .ForMember(dest => dest.BranchName, opt => opt.MapFrom(src => src.BranchName))
+            .ForMember(dest => dest.TotalAmount, opt => opt.MapFrom(src => src.TotalAmount))
+            .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status))
+            .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => src.CreatedAt))
+            .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => src.UpdatedAt))
+            .ForMember(dest => dest.Items, opt => opt.MapFrom(src => src.Items));
+
         CreateMap<GetSaleItemResult, GetSaleItemResponse>();
     }
 
@@ -89,10 +103,16 @@ public class SalesApiProfile : Profile
     /// </summary>
     private void ConfigureCancelSaleMappings()
     {
+        // FIX: Mapear de CancelSaleRequest para CancelSaleCommand
+        CreateMap<CancelSaleRequest, CancelSaleCommand>()
+            .ConstructUsing(src => new CancelSaleCommand(src.Id));
+
+        // E também manter o mapeamento direto de Guid para CancelSaleCommand
         CreateMap<Guid, CancelSaleCommand>()
             .ConstructUsing(id => new CancelSaleCommand(id));
 
-        CreateMap<CancelSaleResult, CancelSaleResponse>();
+        CreateMap<CancelSaleResult, CancelSaleResponse>()
+            .ForMember(dest => dest.SaleNumber, opt => opt.MapFrom(src => src.SaleNumber)); // Explicit mapping
     }
 
     /// <summary>

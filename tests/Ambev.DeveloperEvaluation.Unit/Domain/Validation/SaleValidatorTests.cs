@@ -163,7 +163,8 @@ public class SaleValidatorTests
     {
         // Arrange
         var sale = SaleTestData.GenerateValidSaleWithItems();
-        sale.SaleDate = DateTime.UtcNow;
+        // Usar data passada por 1 segundo para evitar problemas de timing
+        sale.SaleDate = DateTime.UtcNow.AddSeconds(-1);
 
         // Act
         var result = _validator.TestValidate(sale);
@@ -393,16 +394,26 @@ public class SaleValidatorTests
     public void Given_SaleWithInvalidItem_When_Validated_Then_ShouldHaveItemError()
     {
         // Arrange
-        var sale = SaleTestData.GenerateValidSale();
-        var invalidItem = SaleTestData.GenerateValidSaleItem();
-        invalidItem.ProductName = string.Empty; // Make item invalid
-        sale.Items.Add(invalidItem);
+        var sale = SaleTestData.GenerateValidSaleWithItems(1); // Começar com uma venda válida
+        
+        // Tornar o item inválido
+        var item = sale.Items.First();
+        item.ProductName = string.Empty; // Tornar inválido
+        
+        // Recalcular total para manter a venda válida em outros aspectos
+        sale.CalculateTotalAmount();
 
         // Act
         var result = _validator.TestValidate(sale);
 
         // Assert
-        result.ShouldHaveValidationErrorFor(x => x.Items);
+        // Verificar que há erro de validação relacionado aos itens
+        // O erro específico será em Items[0].ProductName
+        result.ShouldHaveValidationErrorFor("Items[0].ProductName")
+              .WithErrorMessage("Product name is required");
+              
+        // Garantir que o total não está causando erro adicional
+        result.ShouldNotHaveValidationErrorFor(x => x.TotalAmount);
     }
 
     #endregion

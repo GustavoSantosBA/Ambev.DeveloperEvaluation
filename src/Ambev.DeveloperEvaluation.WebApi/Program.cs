@@ -20,60 +20,11 @@ public class Program
         {
             Log.Information("Starting web application");
 
-            WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-            builder.AddDefaultLogging();
-
-            builder.Services.AddControllers();
-            builder.Services.AddEndpointsApiExplorer();
-
-            builder.AddBasicHealthChecks();
-            builder.Services.AddSwaggerGen();
-
-            builder.Services.AddDbContext<DefaultContext>(options =>
-                options.UseNpgsql(
-                    builder.Configuration.GetConnectionString("DefaultConnection"),
-                    b => b.MigrationsAssembly("Ambev.DeveloperEvaluation.ORM")
-                )
-            );
-
-            builder.Services.AddJwtAuthentication(builder.Configuration);
-
-            // Register all dependencies including Sales
-            builder.RegisterDependencies();
-
-            // AutoMapper configuration - will automatically discover all profiles
-            builder.Services.AddAutoMapper(
-                typeof(Program).Assembly, 
-                typeof(ApplicationLayer).Assembly);
-
-            // MediatR configuration - will automatically discover all handlers
-            builder.Services.AddMediatR(cfg =>
-            {
-                cfg.RegisterServicesFromAssemblies(
-                    typeof(ApplicationLayer).Assembly,
-                    typeof(Program).Assembly
-                );
-            });
-
-            builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+            var builder = WebApplication.CreateBuilder(args);
+            ConfigureServices(builder);
 
             var app = builder.Build();
-            app.UseMiddleware<ValidationExceptionMiddleware>();
-
-            if (app.Environment.IsDevelopment())
-            {
-                app.UseSwagger();
-                app.UseSwaggerUI();
-            }
-
-            app.UseHttpsRedirection();
-
-            app.UseAuthentication();
-            app.UseAuthorization();
-
-            app.UseBasicHealthChecks();
-
-            app.MapControllers();
+            ConfigurePipeline(app);
 
             app.Run();
         }
@@ -85,5 +36,101 @@ public class Program
         {
             Log.CloseAndFlush();
         }
+    }
+
+    public static void ConfigureServices(WebApplicationBuilder builder)
+    {
+        try
+        {
+            Log.Information("Configuring services");
+
+            // Logging configuration
+            builder.AddDefaultLogging();
+
+            // Basic services
+            builder.Services.AddControllers();
+            builder.Services.AddEndpointsApiExplorer();
+            builder.Services.AddSwaggerGen();
+
+            // Database configuration
+            builder.Services.AddDbContext<DefaultContext>(options =>
+                options.UseNpgsql(
+                    builder.Configuration.GetConnectionString("DefaultConnection"),
+                    b => b.MigrationsAssembly("Ambev.DeveloperEvaluation.ORM")
+                )
+            );
+
+            // Health checks
+            builder.AddBasicHealthChecks();
+
+            // Authentication
+            builder.Services.AddJwtAuthentication(builder.Configuration);
+
+            // Dependencies registration
+            builder.RegisterDependencies();
+
+            // AutoMapper configuration
+            builder.Services.AddAutoMapper(
+                typeof(Program).Assembly, 
+                typeof(ApplicationLayer).Assembly);
+
+            // MediatR configuration
+            builder.Services.AddMediatR(cfg =>
+            {
+                cfg.RegisterServicesFromAssemblies(
+                    typeof(ApplicationLayer).Assembly,
+                    typeof(Program).Assembly
+                );
+            });
+
+            builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "Error configuring services");
+            throw;
+        }
+    }
+
+    public static void ConfigurePipeline(WebApplication app)
+    {
+        try
+        {
+            Log.Information("Configuring application pipeline");
+
+            app.UseMiddleware<ValidationExceptionMiddleware>();
+
+            if (app.Environment.IsDevelopment())
+            {
+                app.UseSwagger();
+                app.UseSwaggerUI();
+            }
+
+            app.UseHttpsRedirection();
+            app.UseRouting();
+            app.UseAuthentication();
+            app.UseAuthorization();
+            app.UseBasicHealthChecks();
+            app.MapControllers();
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "Error configuring application pipeline");
+            throw;
+        }
+    }
+
+    // Factory method for tests - creates a WebApplication instance
+    public static WebApplication CreateApp(string[] args = null)
+    {
+        args ??= Array.Empty<string>();
+        
+        var builder = WebApplication.CreateBuilder(args);
+        ConfigureServices(builder);
+        
+        var app = builder.Build();
+        ConfigurePipeline(app);
+        
+        return app;
     }
 }

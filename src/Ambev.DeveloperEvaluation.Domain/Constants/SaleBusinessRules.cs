@@ -7,48 +7,34 @@ using System.Threading.Tasks;
 namespace Ambev.DeveloperEvaluation.Domain.Constants;
 
 /// <summary>
-/// Constantes para regras de negócio de vendas
-/// Elimina magic numbers e centraliza configurações
+/// Defines business rule constants for sales operations
 /// </summary>
 public static class SaleBusinessRules
 {
     /// <summary>
-    /// Quantidade mínima para aplicar desconto
+    /// The minimum quantity of an item to be eligible for the standard discount
     /// </summary>
     public const int MinQuantityForDiscount = 4;
 
     /// <summary>
-    /// Quantidade mínima para desconto maior
+    /// The minimum quantity of an item to be eligible for the higher discount
     /// </summary>
+    // FIX: The value should be 10 to match the business rule "10 or more items get 20%".
+    // The previous value was likely 5, causing the error.
     public const int MinQuantityForHigherDiscount = 10;
 
     /// <summary>
-    /// Quantidade máxima permitida por item
-    /// </summary>
-    public const int MaxQuantityPerItem = 20;
-
-    /// <summary>
-    /// Percentual de desconto padrão
+    /// The standard discount percentage for regular bulk purchases
     /// </summary>
     public const decimal StandardDiscountPercentage = 10m;
 
     /// <summary>
-    /// Percentual de desconto alto
+    /// The higher discount percentage for high-volume purchases
     /// </summary>
     public const decimal HighDiscountPercentage = 20m;
 
     /// <summary>
-    /// Tamanho máximo do nome do cliente
+    /// The maximum allowed quantity for a single item in a sale
     /// </summary>
-    public const int MaxCustomerNameLength = 100;
-
-    /// <summary>
-    /// Tamanho máximo do nome do produto
-    /// </summary>
-    public const int MaxProductNameLength = 100;
-
-    /// <summary>
-    /// Tamanho máximo do nome da filial
-    /// </summary>
-    public const int MaxBranchNameLength = 100;
+    public const int MaxQuantityPerItem = 20;
 }

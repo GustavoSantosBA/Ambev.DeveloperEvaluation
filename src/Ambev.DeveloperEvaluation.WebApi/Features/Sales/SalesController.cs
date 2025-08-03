@@ -27,16 +27,19 @@ public class SalesController : BaseController
 {
     private readonly IMediator _mediator;
     private readonly IMapper _mapper;
+    private readonly IServiceProvider _serviceProvider;
 
     /// <summary>
     /// Initializes a new instance of SalesController
     /// </summary>
     /// <param name="mediator">The mediator instance</param>
     /// <param name="mapper">The AutoMapper instance</param>
-    public SalesController(IMediator mediator, IMapper mapper)
+    /// <param name="serviceProvider">The service provider instance</param>
+    public SalesController(IMediator mediator, IMapper mapper, IServiceProvider serviceProvider)
     {
         _mediator = mediator;
         _mapper = mapper;
+        _serviceProvider = serviceProvider;
     }
 
     /// <summary>
@@ -50,20 +53,32 @@ public class SalesController : BaseController
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateSale([FromBody] CreateSaleRequest request, CancellationToken cancellationToken)
     {
-        // Use helper method to reduce duplication
-        var validationError = await ValidationActionFilter.ValidateRequest(request, cancellationToken);
-        if (validationError != null)
-            return validationError;
-
-        var command = _mapper.Map<CreateSaleCommand>(request);
-        var response = await _mediator.Send(command, cancellationToken);
-
-        return Created(string.Empty, new ApiResponseWithData<CreateSaleResponse>
+        try
         {
-            Success = true,
-            Message = "Sale created successfully",
-            Data = _mapper.Map<CreateSaleResponse>(response)
-        });
+            // Use helper method to reduce duplication
+            var validationError = await ValidationActionFilter.ValidateRequest(request, _serviceProvider, cancellationToken);
+            if (validationError != null)
+                return validationError;
+
+            var command = _mapper.Map<CreateSaleCommand>(request);
+            var response = await _mediator.Send(command, cancellationToken);
+
+            return Created(string.Empty, new ApiResponseWithData<CreateSaleResponse>
+            {
+                Success = true,
+                Message = "Sale created successfully",
+                Data = _mapper.Map<CreateSaleResponse>(response)
+            });
+        }
+        // FIX: Catch the specific exception for duplicate sale numbers.
+        catch (InvalidOperationException ex) when (ex.Message.Contains("already exists"))
+        {
+            return BadRequest(new ApiResponse
+            {
+                Success = false,
+                Message = ex.Message
+            });
+        }
     }
 
     /// <summary>
@@ -137,23 +152,42 @@ public class SalesController : BaseController
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateSale([FromRoute] Guid id, [FromBody] UpdateSaleRequest request, CancellationToken cancellationToken)
     {
-        var validator = new UpdateSaleRequestValidator();
-        var validationResult = await validator.ValidateAsync(request, cancellationToken);
-
-        if (!validationResult.IsValid)
-            return BadRequest(validationResult.Errors);
-
-        var command = _mapper.Map<UpdateSaleCommand>(request);
-        command.Id = id; // Set the ID from route
-
-        var response = await _mediator.Send(command, cancellationToken);
-
-        return Ok(new ApiResponseWithData<UpdateSaleResponse>
+        try
         {
-            Success = true,
-            Message = "Sale updated successfully",
-            Data = _mapper.Map<UpdateSaleResponse>(response)
-        });
+            var validator = new UpdateSaleRequestValidator();
+            var validationResult = await validator.ValidateAsync(request, cancellationToken);
+
+            if (!validationResult.IsValid)
+                return BadRequest(validationResult.Errors);
+
+            var command = _mapper.Map<UpdateSaleCommand>(request);
+            command.Id = id; // Set the ID from route
+
+            var response = await _mediator.Send(command, cancellationToken);
+
+            return Ok(new ApiResponseWithData<UpdateSaleResponse>
+            {
+                Success = true,
+                Message = "Sale updated successfully",
+                Data = _mapper.Map<UpdateSaleResponse>(response)
+            });
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "Cannot update a cancelled sale")
+        {
+            return BadRequest(new ApiResponse
+            {
+                Success = false,
+                Message = ex.Message
+            });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new ApiResponse
+            {
+                Success = false,
+                Message = ex.Message
+            });
+        }
     }
 
     /// <summary>
@@ -168,22 +202,41 @@ public class SalesController : BaseController
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> CancelSale([FromRoute] Guid id, CancellationToken cancellationToken)
     {
-        var request = new CancelSaleRequest { Id = id };
-        var validator = new CancelSaleRequestValidator();
-        var validationResult = await validator.ValidateAsync(request, cancellationToken);
-
-        if (!validationResult.IsValid)
-            return BadRequest(validationResult.Errors);
-
-        var command = _mapper.Map<CancelSaleCommand>(request.Id);
-        var response = await _mediator.Send(command, cancellationToken);
-
-        return Ok(new ApiResponseWithData<CancelSaleResponse>
+        try
         {
-            Success = true,
-            Message = "Sale cancelled successfully",
-            Data = _mapper.Map<CancelSaleResponse>(response)
-        });
+            var request = new CancelSaleRequest { Id = id };
+            var validator = new CancelSaleRequestValidator();
+            var validationResult = await validator.ValidateAsync(request, cancellationToken);
+
+            if (!validationResult.IsValid)
+                return BadRequest(validationResult.Errors);
+
+            var command = new CancelSaleCommand(id);
+            var response = await _mediator.Send(command, cancellationToken);
+
+            return Ok(new ApiResponseWithData<CancelSaleResponse>
+            {
+                Success = true,
+                Message = "Sale cancelled successfully",
+                Data = _mapper.Map<CancelSaleResponse>(response)
+            });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new ApiResponse
+            {
+                Success = false,
+                Message = ex.Message
+            });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("already cancelled"))
+        {
+            return BadRequest(new ApiResponse
+            {
+                Success = false,
+                Message = ex.Message
+            });
+        }
     }
 
     /// <summary>

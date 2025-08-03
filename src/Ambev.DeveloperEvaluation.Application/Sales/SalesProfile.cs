@@ -54,6 +54,7 @@ public class SalesProfile : Profile
             .ForMember(dest => dest.Id, opt => opt.Ignore()) // Auto-generated
             .ForMember(dest => dest.Status, opt => opt.MapFrom(src => Domain.Enums.SaleStatus.Active))
             .ForMember(dest => dest.SaleDate, opt => opt.MapFrom(src => src.SaleDate ?? DateTime.UtcNow))
+            .ForMember(dest => dest.SaleNumber, opt => opt.MapFrom(src => src.SaleNumber)) // Garantir mapeamento explícito
             .ForMember(dest => dest.TotalAmount, opt => opt.Ignore()) // Calculated later
             .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
             .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore());
@@ -65,6 +66,7 @@ public class SalesProfile : Profile
 
         // Entity to Result mappings
         CreateMap<Sale, CreateSaleResult>()
+            .ForMember(dest => dest.SaleNumber, opt => opt.MapFrom(src => src.SaleNumber)) // Garantir mapeamento explícito
             .ForMember(dest => dest.ItemCount, opt => opt.MapFrom(src => src.Items.Count(i => !i.IsCancelled)));
     }
 
@@ -89,8 +91,21 @@ public class SalesProfile : Profile
     /// </summary>
     private void ConfigureGetSaleMappings()
     {
-        // Entity to Result mappings
-        CreateMap<Sale, GetSaleResult>();
+        // CRITICAL FIX: Explicit mapping for all properties
+        CreateMap<Sale, GetSaleResult>()
+            .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Id))
+            .ForMember(dest => dest.SaleNumber, opt => opt.MapFrom(src => src.SaleNumber))
+            .ForMember(dest => dest.SaleDate, opt => opt.MapFrom(src => src.SaleDate))
+            .ForMember(dest => dest.CustomerId, opt => opt.MapFrom(src => src.CustomerId))
+            .ForMember(dest => dest.CustomerName, opt => opt.MapFrom(src => src.CustomerName))
+            .ForMember(dest => dest.BranchId, opt => opt.MapFrom(src => src.BranchId))
+            .ForMember(dest => dest.BranchName, opt => opt.MapFrom(src => src.BranchName))
+            .ForMember(dest => dest.TotalAmount, opt => opt.MapFrom(src => src.TotalAmount))
+            .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status))
+            .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => src.CreatedAt))
+            .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => src.UpdatedAt))
+            .ForMember(dest => dest.Items, opt => opt.MapFrom(src => src.Items));
+
         CreateMap<SaleItem, GetSaleItemResult>();
     }
 
