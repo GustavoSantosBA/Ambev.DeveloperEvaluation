@@ -1,4 +1,4 @@
-using Ambev.DeveloperEvaluation.Domain.Entities;
+﻿using Ambev.DeveloperEvaluation.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -61,8 +61,8 @@ public class SaleConfiguration : IEntityTypeConfiguration<Sale>
 
         // Configure relationship with SaleItems
         builder.HasMany(s => s.Items)
-            .WithOne()
-            .HasForeignKey("SaleId")
+            .WithOne(si => si.Sale)  // ← CORRIJA: Adicione a propriedade de navegação
+            .HasForeignKey(si => si.SaleId)
             .OnDelete(DeleteBehavior.Cascade);
 
         // Indexes for performance

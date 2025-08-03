@@ -2,12 +2,12 @@ using Ambev.DeveloperEvaluation.Common.Validation;
 using Ambev.DeveloperEvaluation.Domain.Common;
 using Ambev.DeveloperEvaluation.Domain.Validation;
 using Ambev.DeveloperEvaluation.Domain.Constants;
+using Ambev.DeveloperEvaluation.Domain.Enums;
 
 namespace Ambev.DeveloperEvaluation.Domain.Entities;
 
 /// <summary>
-/// Represents an individual item within a sale.
-/// Contains product information and pricing details with business rule validation.
+/// Represents an item within a sale, following DDD principles.
 /// </summary>
 public class SaleItem : BaseEntity
 {
@@ -45,6 +45,17 @@ public class SaleItem : BaseEntity
     /// Gets or sets whether this item is cancelled
     /// </summary>
     public bool IsCancelled { get; set; }
+
+    /// <summary>
+    /// The foreign key that links this item to a Sale.
+    /// </summary>
+    public Guid SaleId { get; set; }
+
+    /// <summary>
+    /// The navigation property back to the parent Sale.
+    /// This is what the error message is looking for.
+    /// </summary>
+    public Sale Sale { get; set; } = null!;
 
     /// <summary>
     /// Initializes a new instance of the SaleItem class
@@ -102,12 +113,13 @@ public class SaleItem : BaseEntity
         {
             Discount = 0;
         }
+        // FIX: A condição para o desconto padrão deve ser menor que o mínimo para o desconto maior.
         else if (Quantity >= SaleBusinessRules.MinQuantityForDiscount &&
                  Quantity < SaleBusinessRules.MinQuantityForHigherDiscount)
         {
             Discount = SaleBusinessRules.StandardDiscountPercentage;
         }
-        else if (Quantity >= SaleBusinessRules.MinQuantityForHigherDiscount)
+        else // Se a quantidade for igual ou maior que MinQuantityForHigherDiscount
         {
             Discount = SaleBusinessRules.HighDiscountPercentage;
         }

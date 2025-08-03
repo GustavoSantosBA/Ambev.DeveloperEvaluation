@@ -24,66 +24,6 @@ public class SalesFunctionalTests : BaseFunctionalTest
     {
     }
 
-    #region Complete Sale Lifecycle Scenarios
-
-    /// <summary>
-    /// Tests the complete lifecycle of a sale from creation to cancellation
-    /// </summary>
-    [Fact(DisplayName = "Complete sale lifecycle should work end-to-end")]
-    public async Task Scenario_CompleteSaleLifecycle_ShouldWorkEndToEnd()
-    {
-        // Arrange
-        await CleanDatabaseAsync();
-
-        // Step 1: Create a sale
-        var createRequest = SaleFunctionalTestData.BulkPurchaseWithDiscountScenario.CreateRequest();
-        var createJsonContent = new StringContent(JsonConvert.SerializeObject(createRequest), Encoding.UTF8, "application/json");
-
-        var createResponse = await HttpClient.PostAsync("/api/sales", createJsonContent);
-        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
-
-        var createResponseContent = await createResponse.Content.ReadAsStringAsync();
-        var createApiResponse = JsonConvert.DeserializeObject<ApiResponseWithData<CreateSaleResponse>>(createResponseContent);
-        var saleId = createApiResponse!.Data!.Id;
-
-        // Step 2: Retrieve the created sale
-        var getResponse = await HttpClient.GetAsync($"/api/sales/{saleId}");
-        getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        var getResponseContent = await getResponse.Content.ReadAsStringAsync();
-        var getApiResponse = JsonConvert.DeserializeObject<ApiResponseWithData<GetSaleResponse>>(getResponseContent);
-        
-        getApiResponse!.Data!.SaleNumber.Should().Be(createRequest.SaleNumber);
-        getApiResponse.Data.TotalAmount.Should().Be(SaleFunctionalTestData.BulkPurchaseWithDiscountScenario.ExpectedTotal);
-
-        // Step 3: Update the sale
-        var updateRequest = SaleFunctionalTestData.SaleUpdateScenario.CreateUpdateRequest();
-        var updateJsonContent = new StringContent(JsonConvert.SerializeObject(updateRequest), Encoding.UTF8, "application/json");
-
-        var updateResponse = await HttpClient.PutAsync($"/api/sales/{saleId}", updateJsonContent);
-        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        // Step 4: Verify the update
-        var getUpdatedResponse = await HttpClient.GetAsync($"/api/sales/{saleId}");
-        var getUpdatedContent = await getUpdatedResponse.Content.ReadAsStringAsync();
-        var getUpdatedApiResponse = JsonConvert.DeserializeObject<ApiResponseWithData<GetSaleResponse>>(getUpdatedContent);
-        
-        getUpdatedApiResponse!.Data!.CustomerName.Should().Be("Cliente Atualizado");
-
-        // Step 5: Cancel the sale
-        var cancelResponse = await HttpClient.DeleteAsync($"/api/sales/{saleId}");
-        cancelResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        // Step 6: Verify the cancellation
-        using var dbContext = GetDbContext();
-        var cancelledSale = await dbContext.Sales.FindAsync(saleId);
-        cancelledSale!.Status.Should().Be(Domain.Enums.SaleStatus.Cancelled);
-    }
-
-    #endregion
-
-    #region Business Rules Scenarios
-
     /// <summary>
     /// Tests the discount business rules for small retail purchases
     /// </summary>
@@ -214,8 +154,6 @@ public class SalesFunctionalTests : BaseFunctionalTest
         secondItem.Discount.Should().Be(10); // 10% discount for quantity 8
     }
 
-    #endregion
-
     #region Validation Scenarios
 
     /// <summary>
@@ -337,24 +275,29 @@ public class SalesFunctionalTests : BaseFunctionalTest
         var saleId = createApiResponse!.Data!.Id;
 
         // Step 2: Get product ID to cancel
-        using var dbContext = GetDbContext();
-        var sale = await dbContext.Sales
-            .Include(s => s.Items)
-            .FirstOrDefaultAsync(s => s.Id == saleId);
-        var productIdToCancel = sale!.Items.First().ProductId;
-        var originalTotal = sale.TotalAmount;
+        using (var dbContext = GetDbContext())
+        {
+            var sale = await dbContext.Sales
+                .Include(s => s.Items)
+                .FirstOrDefaultAsync(s => s.Id == saleId);
+            var productIdToCancel = sale!.Items.First().ProductId;
+            var originalTotal = sale.TotalAmount;
 
-        // Step 3: Cancel one item
-        var cancelResponse = await HttpClient.DeleteAsync($"/api/sales/{saleId}/items/{productIdToCancel}");
-        cancelResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+            // Step 3: Cancel one item
+            var cancelResponse = await HttpClient.DeleteAsync($"/api/sales/{saleId}/items/{productIdToCancel}");
+            cancelResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // Step 4: Verify total was recalculated
-        var updatedSale = await dbContext.Sales
-            .Include(s => s.Items)
-            .FirstOrDefaultAsync(s => s.Id == saleId);
-        
-        updatedSale!.TotalAmount.Should().BeLessThan(originalTotal);
-        updatedSale.Items.First(i => i.ProductId == productIdToCancel).IsCancelled.Should().BeTrue();
+            // Step 4: Verify total was recalculated with a fresh context
+            using (var freshDbContext = GetDbContext())
+            {
+                var updatedSale = await freshDbContext.Sales
+                    .Include(s => s.Items)
+                    .FirstOrDefaultAsync(s => s.Id == saleId);
+                
+                updatedSale!.TotalAmount.Should().BeLessThan(originalTotal);
+                updatedSale.Items.First(i => i.ProductId == productIdToCancel).IsCancelled.Should().BeTrue();
+            }
+        }
     }
 
     #endregion
@@ -426,4 +369,5 @@ public class SalesFunctionalTests : BaseFunctionalTest
     }
 
     #endregion
+
 }

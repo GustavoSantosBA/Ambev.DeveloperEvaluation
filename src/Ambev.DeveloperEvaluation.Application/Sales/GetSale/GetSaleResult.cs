@@ -13,7 +13,7 @@ public class GetSaleResult
     public Guid Id { get; set; }
 
     /// <summary>
-    /// The sale number - unique identifier for the sale
+    /// The sale number
     /// </summary>
     public string SaleNumber { get; set; } = string.Empty;
 

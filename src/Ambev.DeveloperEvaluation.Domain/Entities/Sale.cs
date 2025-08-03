@@ -74,6 +74,7 @@ public class Sale : BaseEntity
     /// </summary>
     public Sale()
     {
+        // FIX: Use DateTime.UtcNow to ensure all dates are in UTC format.
         CreatedAt = DateTime.UtcNow;
         Status = SaleStatus.Active;
         SaleDate = DateTime.UtcNow;
@@ -101,6 +102,7 @@ public class Sale : BaseEntity
     public void Cancel()
     {
         Status = SaleStatus.Cancelled;
+        // FIX: Use DateTime.UtcNow to ensure all dates are in UTC format.
         UpdatedAt = DateTime.UtcNow;
     }
 
@@ -116,6 +118,7 @@ public class Sale : BaseEntity
         }
         
         TotalAmount = Items.Where(item => !item.IsCancelled).Sum(item => item.Total);
+        // FIX: Use DateTime.UtcNow to ensure all dates are in UTC format.
         UpdatedAt = DateTime.UtcNow;
     }
 

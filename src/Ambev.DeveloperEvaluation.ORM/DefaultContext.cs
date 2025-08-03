@@ -18,7 +18,10 @@ public class DefaultContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // Esta linha carrega TODAS as configurações do seu projeto ORM,
+        // incluindo a SaleConfiguration.
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+        
         base.OnModelCreating(modelBuilder);
     }
 }

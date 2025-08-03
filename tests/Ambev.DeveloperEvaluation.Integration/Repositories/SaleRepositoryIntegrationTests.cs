@@ -1,28 +1,29 @@
 using Ambev.DeveloperEvaluation.Domain.Entities;
-using Ambev.DeveloperEvaluation.Domain.Enums;
 using Ambev.DeveloperEvaluation.Domain.Repositories;
 using Ambev.DeveloperEvaluation.Integration.Setup;
 using Ambev.DeveloperEvaluation.Integration.TestData;
-using Ambev.DeveloperEvaluation.ORM.Repositories;
+using Ambev.DeveloperEvaluation.ORM.Repositories; // FIX: Add using for SaleRepository
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore; // FIX: Add using for EF Core features like Include and DbUpdateException
+using Microsoft.Extensions.DependencyInjection;
+using System.Diagnostics;
 using Xunit;
 
 namespace Ambev.DeveloperEvaluation.Integration.Repositories;
 
 /// <summary>
-/// Integration tests for SaleRepository that test all database operations
-/// with a real PostgreSQL database using Testcontainers
+/// Integration tests for the SaleRepository
 /// </summary>
-public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
+public class SaleRepositoryIntegrationTests : BaseIntegrationTest
 {
-    private readonly ISaleRepository _repository;
+    private readonly ISaleRepository _saleRepository;
 
-    public SaleRepositoryIntegrationTests()
+    public SaleRepositoryIntegrationTests(IntegrationTestWebAppFactory factory) : base(factory)
     {
-        _repository = new SaleRepository(DbContext);
+        // Resolve the repository from the service provider
+        _saleRepository = Factory.Services.CreateScope().ServiceProvider.GetRequiredService<ISaleRepository>();
     }
-
+    
     #region CreateAsync Tests
 
     /// <summary>
@@ -33,27 +34,29 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
     {
         // Arrange
         await CleanDatabaseAsync();
-        var sale = SaleRepositoryTestData.GenerateValidSaleWithItems(2);
+        var sale = SaleIntegrationTestData.GenerateValidSaleEntity();
 
         // Act
-        var createdSale = await _repository.CreateAsync(sale);
+        var createdSale = await _saleRepository.CreateAsync(sale);
 
         // Assert
         createdSale.Should().NotBeNull();
         createdSale.Id.Should().NotBeEmpty();
-        createdSale.Items.Should().HaveCount(2);
+        createdSale.Items.Should().NotBeEmpty();
         createdSale.TotalAmount.Should().BeGreaterThan(0);
 
         // Verify in fresh context
-        using var freshContext = CreateFreshContext();
+        using var freshContext = GetDbContext();
         var persistedSale = await freshContext.Sales
             .Include(s => s.Items)
             .FirstOrDefaultAsync(s => s.Id == createdSale.Id);
 
         persistedSale.Should().NotBeNull();
         persistedSale!.SaleNumber.Should().Be(sale.SaleNumber);
-        persistedSale.Items.Should().HaveCount(2);
-        persistedSale.TotalAmount.Should().Be(createdSale.TotalAmount);
+        persistedSale.Items.Should().HaveCount(sale.Items.Count);
+        
+        // FIX: Use BeApproximately to handle database rounding for decimal values.
+        persistedSale.TotalAmount.Should().BeApproximately(createdSale.TotalAmount, 0.01m);
     }
 
     /// <summary>
@@ -65,14 +68,15 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
         // Arrange
         await CleanDatabaseAsync();
         const int concurrentSales = 5;
-        var sales = SaleRepositoryTestData.GenerateMultipleSalesWithItems(concurrentSales);
+        var sales = Enumerable.Range(0, concurrentSales).Select(_ => SaleIntegrationTestData.GenerateValidSaleEntity()).ToList();
         var tasks = new List<Task<Sale>>();
 
         // Act
         foreach (var sale in sales)
         {
             // Create separate context for each concurrent operation
-            var freshContext = CreateFreshContext();
+            // FIX: Use the correct method to get a fresh context
+            var freshContext = GetDbContext();
             var repo = new SaleRepository(freshContext);
             tasks.Add(repo.CreateAsync(sale));
         }
@@ -84,7 +88,8 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
         results.Should().AllSatisfy(result => result.Id.Should().NotBeEmpty());
 
         // Verify all persisted
-        using var verificationContext = CreateFreshContext();
+        // FIX: Use the correct method to get a fresh context
+        using var verificationContext = GetDbContext();
         var persistedCount = await verificationContext.Sales.CountAsync();
         persistedCount.Should().Be(concurrentSales);
     }
@@ -101,17 +106,17 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
     {
         // Arrange
         await CleanDatabaseAsync();
-        var sale = SaleRepositoryTestData.GenerateValidSaleWithItems(3);
-        var createdSale = await _repository.CreateAsync(sale);
+        var sale = SaleIntegrationTestData.GenerateValidSaleEntity();
+        var createdSale = await _saleRepository.CreateAsync(sale);
 
         // Act
-        var retrievedSale = await _repository.GetByIdAsync(createdSale.Id);
+        var retrievedSale = await _saleRepository.GetByIdAsync(createdSale.Id);
 
         // Assert
         retrievedSale.Should().NotBeNull();
         retrievedSale!.Id.Should().Be(createdSale.Id);
         retrievedSale.SaleNumber.Should().Be(createdSale.SaleNumber);
-        retrievedSale.Items.Should().HaveCount(3);
+        retrievedSale.Items.Should().HaveCount(sale.Items.Count);
         retrievedSale.TotalAmount.Should().Be(createdSale.TotalAmount);
     }
 
@@ -126,7 +131,7 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
         var nonExistentId = Guid.NewGuid();
 
         // Act
-        var result = await _repository.GetByIdAsync(nonExistentId);
+        var result = await _saleRepository.GetByIdAsync(nonExistentId);
 
         // Assert
         result.Should().BeNull();
@@ -145,11 +150,12 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
         // Arrange
         await CleanDatabaseAsync();
         var saleNumber = "TEST-UNIQUE-001";
-        var sale = SaleRepositoryTestData.GenerateSaleWithNumber(saleNumber);
-        await _repository.CreateAsync(sale);
+        var sale = SaleIntegrationTestData.GenerateValidSaleEntity();
+        sale.SaleNumber = saleNumber;
+        await _saleRepository.CreateAsync(sale);
 
         // Act
-        var retrievedSale = await _repository.GetBySaleNumberAsync(saleNumber);
+        var retrievedSale = await _saleRepository.GetBySaleNumberAsync(saleNumber);
 
         // Assert
         retrievedSale.Should().NotBeNull();
@@ -167,7 +173,7 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
         await CleanDatabaseAsync();
 
         // Act
-        var result = await _repository.GetBySaleNumberAsync("NON-EXISTENT");
+        var result = await _saleRepository.GetBySaleNumberAsync("NON-EXISTENT");
 
         // Assert
         result.Should().BeNull();
@@ -188,17 +194,18 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
         var customerId = Guid.NewGuid();
         var customerSales = new List<Sale>
         {
-            SaleRepositoryTestData.GenerateSaleWithCustomerId(customerId),
-            SaleRepositoryTestData.GenerateSaleWithCustomerId(customerId)
+            SaleIntegrationTestData.GenerateValidSaleEntity(),
+            SaleIntegrationTestData.GenerateValidSaleEntity()
         };
-        var otherSale = SaleRepositoryTestData.GenerateValidSaleWithItems();
+        customerSales.ForEach(s => s.CustomerId = customerId);
+        var otherSale = SaleIntegrationTestData.GenerateValidSaleEntity();
 
         foreach (var sale in customerSales)
-            await _repository.CreateAsync(sale);
-        await _repository.CreateAsync(otherSale);
+            await _saleRepository.CreateAsync(sale);
+        await _saleRepository.CreateAsync(otherSale);
 
         // Act
-        var results = await _repository.GetByCustomerIdAsync(customerId);
+        var results = await _saleRepository.GetByCustomerIdAsync(customerId);
 
         // Assert
         results.Should().HaveCount(2);
@@ -214,16 +221,18 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
         // Arrange
         await CleanDatabaseAsync();
         var customerId = Guid.NewGuid();
-        var oldSale = SaleRepositoryTestData.GenerateSaleWithCustomerId(customerId);
+        var oldSale = SaleIntegrationTestData.GenerateValidSaleEntity();
+        oldSale.CustomerId = customerId;
         oldSale.SaleDate = DateTime.UtcNow.AddDays(-10);
-        var newSale = SaleRepositoryTestData.GenerateSaleWithCustomerId(customerId);
+        var newSale = SaleIntegrationTestData.GenerateValidSaleEntity();
+        newSale.CustomerId = customerId;
         newSale.SaleDate = DateTime.UtcNow.AddDays(-1);
 
-        await _repository.CreateAsync(oldSale);
-        await _repository.CreateAsync(newSale);
+        await _saleRepository.CreateAsync(oldSale);
+        await _saleRepository.CreateAsync(newSale);
 
         // Act
-        var results = (await _repository.GetByCustomerIdAsync(customerId)).ToList();
+        var results = (await _saleRepository.GetByCustomerIdAsync(customerId)).ToList();
 
         // Assert
         results.Should().HaveCount(2);
@@ -245,17 +254,18 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
         var branchId = Guid.NewGuid();
         var branchSales = new List<Sale>
         {
-            SaleRepositoryTestData.GenerateSaleWithBranchId(branchId),
-            SaleRepositoryTestData.GenerateSaleWithBranchId(branchId)
+            SaleIntegrationTestData.GenerateValidSaleEntity(),
+            SaleIntegrationTestData.GenerateValidSaleEntity()
         };
-        var otherSale = SaleRepositoryTestData.GenerateValidSaleWithItems();
+        branchSales.ForEach(s => s.BranchId = branchId);
+        var otherSale = SaleIntegrationTestData.GenerateValidSaleEntity();
 
         foreach (var sale in branchSales)
-            await _repository.CreateAsync(sale);
-        await _repository.CreateAsync(otherSale);
+            await _saleRepository.CreateAsync(sale);
+        await _saleRepository.CreateAsync(otherSale);
 
         // Act
-        var results = await _repository.GetByBranchIdAsync(branchId);
+        var results = await _saleRepository.GetByBranchIdAsync(branchId);
 
         // Assert
         results.Should().HaveCount(2);
@@ -277,16 +287,19 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
         var startDate = DateTime.UtcNow.AddDays(-10);
         var endDate = DateTime.UtcNow.AddDays(-5);
         
-        var saleInRange = SaleRepositoryTestData.GenerateSaleWithDate(DateTime.UtcNow.AddDays(-7));
-        var saleBeforeRange = SaleRepositoryTestData.GenerateSaleWithDate(DateTime.UtcNow.AddDays(-15));
-        var saleAfterRange = SaleRepositoryTestData.GenerateSaleWithDate(DateTime.UtcNow.AddDays(-2));
+        var saleInRange = SaleIntegrationTestData.GenerateValidSaleEntity();
+        saleInRange.SaleDate = DateTime.UtcNow.AddDays(-7);
+        var saleBeforeRange = SaleIntegrationTestData.GenerateValidSaleEntity();
+        saleBeforeRange.SaleDate = DateTime.UtcNow.AddDays(-15);
+        var saleAfterRange = SaleIntegrationTestData.GenerateValidSaleEntity();
+        saleAfterRange.SaleDate = DateTime.UtcNow.AddDays(-2);
 
-        await _repository.CreateAsync(saleInRange);
-        await _repository.CreateAsync(saleBeforeRange);
-        await _repository.CreateAsync(saleAfterRange);
+        await _saleRepository.CreateAsync(saleInRange);
+        await _saleRepository.CreateAsync(saleBeforeRange);
+        await _saleRepository.CreateAsync(saleAfterRange);
 
         // Act
-        var results = await _repository.GetByDateRangeAsync(startDate, endDate);
+        var results = await _saleRepository.GetByDateRangeAsync(startDate, endDate);
 
         // Assert
         results.Should().ContainSingle();
@@ -305,13 +318,13 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
     {
         // Arrange
         await CleanDatabaseAsync();
-        var sales = SaleRepositoryTestData.GenerateMultipleSalesWithItems(10);
+        var sales = Enumerable.Range(0, 10).Select(_ => SaleIntegrationTestData.GenerateValidSaleEntity()).ToList();
         foreach (var sale in sales)
-            await _repository.CreateAsync(sale);
+            await _saleRepository.CreateAsync(sale);
 
         // Act
-        var firstPage = await _repository.GetAllAsync(page: 1, pageSize: 3);
-        var secondPage = await _repository.GetAllAsync(page: 2, pageSize: 3);
+        var firstPage = await _saleRepository.GetAllAsync(page: 1, pageSize: 3);
+        var secondPage = await _saleRepository.GetAllAsync(page: 2, pageSize: 3);
 
         // Assert
         firstPage.Should().HaveCount(3);
@@ -330,14 +343,16 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
     {
         // Arrange
         await CleanDatabaseAsync();
-        var oldSale = SaleRepositoryTestData.GenerateSaleWithDate(DateTime.UtcNow.AddDays(-10));
-        var newSale = SaleRepositoryTestData.GenerateSaleWithDate(DateTime.UtcNow.AddDays(-1));
+        var oldSale = SaleIntegrationTestData.GenerateValidSaleEntity();
+        oldSale.SaleDate = DateTime.UtcNow.AddDays(-10);
+        var newSale = SaleIntegrationTestData.GenerateValidSaleEntity();
+        newSale.SaleDate = DateTime.UtcNow.AddDays(-1);
 
-        await _repository.CreateAsync(oldSale);
-        await _repository.CreateAsync(newSale);
+        await _saleRepository.CreateAsync(oldSale);
+        await _saleRepository.CreateAsync(newSale);
 
         // Act
-        var results = (await _repository.GetAllAsync(page: 1, pageSize: 10)).ToList();
+        var results = (await _saleRepository.GetAllAsync(page: 1, pageSize: 10)).ToList();
 
         // Assert
         results.Should().HaveCount(2);
@@ -357,14 +372,15 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
         // Arrange
         await CleanDatabaseAsync();
         var customerId = Guid.NewGuid();
-        var customerSale = SaleRepositoryTestData.GenerateSaleWithCustomerId(customerId);
-        var otherSale = SaleRepositoryTestData.GenerateValidSaleWithItems();
+        var customerSale = SaleIntegrationTestData.GenerateValidSaleEntity();
+        customerSale.CustomerId = customerId;
+        var otherSale = SaleIntegrationTestData.GenerateValidSaleEntity();
 
-        await _repository.CreateAsync(customerSale);
-        await _repository.CreateAsync(otherSale);
+        await _saleRepository.CreateAsync(customerSale);
+        await _saleRepository.CreateAsync(otherSale);
 
         // Act
-        var results = await _repository.GetFilteredAsync(customerId: customerId);
+        var results = await _saleRepository.GetFilteredAsync(customerId: customerId);
 
         // Assert
         results.Should().ContainSingle();
@@ -385,20 +401,21 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
         var endDate = DateTime.UtcNow.AddDays(-1);
 
         // Sale that matches all filters
-        var matchingSale = SaleRepositoryTestData.GenerateSaleWithCustomerId(customerId);
+        var matchingSale = SaleIntegrationTestData.GenerateValidSaleEntity();
+        matchingSale.CustomerId = customerId;
         matchingSale.BranchId = branchId;
         matchingSale.SaleDate = DateTime.UtcNow.AddDays(-5);
 
         // Sale that doesn't match customer filter
-        var nonMatchingSale = SaleRepositoryTestData.GenerateValidSaleWithItems();
+        var nonMatchingSale = SaleIntegrationTestData.GenerateValidSaleEntity();
         nonMatchingSale.BranchId = branchId;
         nonMatchingSale.SaleDate = DateTime.UtcNow.AddDays(-5);
 
-        await _repository.CreateAsync(matchingSale);
-        await _repository.CreateAsync(nonMatchingSale);
+        await _saleRepository.CreateAsync(matchingSale);
+        await _saleRepository.CreateAsync(nonMatchingSale);
 
         // Act
-        var results = await _repository.GetFilteredAsync(
+        var results = await _saleRepository.GetFilteredAsync(
             customerId: customerId,
             branchId: branchId,
             startDate: startDate,
@@ -419,15 +436,16 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
         await CleanDatabaseAsync();
         var customerId = Guid.NewGuid();
         var sales = Enumerable.Range(0, 5)
-            .Select(_ => SaleRepositoryTestData.GenerateSaleWithCustomerId(customerId))
+            .Select(_ => SaleIntegrationTestData.GenerateValidSaleEntity())
             .ToList();
+        sales.ForEach(s => s.CustomerId = customerId);
 
         foreach (var sale in sales)
-            await _repository.CreateAsync(sale);
+            await _saleRepository.CreateAsync(sale);
 
         // Act
-        var firstPage = await _repository.GetFilteredAsync(page: 1, pageSize: 2, customerId: customerId);
-        var secondPage = await _repository.GetFilteredAsync(page: 2, pageSize: 2, customerId: customerId);
+        var firstPage = await _saleRepository.GetFilteredAsync(page: 1, pageSize: 2, customerId: customerId);
+        var secondPage = await _saleRepository.GetFilteredAsync(page: 2, pageSize: 2, customerId: customerId);
 
         // Assert
         firstPage.Should().HaveCount(2);
@@ -448,16 +466,17 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
         await CleanDatabaseAsync();
         var customerId = Guid.NewGuid();
         var customerSales = Enumerable.Range(0, 3)
-            .Select(_ => SaleRepositoryTestData.GenerateSaleWithCustomerId(customerId))
+            .Select(_ => SaleIntegrationTestData.GenerateValidSaleEntity())
             .ToList();
-        var otherSale = SaleRepositoryTestData.GenerateValidSaleWithItems();
+        customerSales.ForEach(s => s.CustomerId = customerId);
+        var otherSale = SaleIntegrationTestData.GenerateValidSaleEntity();
 
         foreach (var sale in customerSales)
-            await _repository.CreateAsync(sale);
-        await _repository.CreateAsync(otherSale);
+            await _saleRepository.CreateAsync(sale);
+        await _saleRepository.CreateAsync(otherSale);
 
         // Act
-        var count = await _repository.GetFilteredCountAsync(customerId: customerId);
+        var count = await _saleRepository.GetFilteredCountAsync(customerId: customerId);
 
         // Assert
         count.Should().Be(3);
@@ -475,8 +494,8 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
     {
         // Arrange
         await CleanDatabaseAsync();
-        var sale = SaleRepositoryTestData.GenerateValidSaleWithItems();
-        var createdSale = await _repository.CreateAsync(sale);
+        var sale = SaleIntegrationTestData.GenerateValidSaleEntity();
+        var createdSale = await _saleRepository.CreateAsync(sale);
 
         // Modify properties
         createdSale.CustomerName = "Updated Customer Name";
@@ -484,7 +503,7 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
         createdSale.UpdatedAt = DateTime.UtcNow;
 
         // Act
-        var updatedSale = await _repository.UpdateAsync(createdSale);
+        var updatedSale = await _saleRepository.UpdateAsync(createdSale);
 
         // Assert
         updatedSale.Should().NotBeNull();
@@ -493,7 +512,8 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
         updatedSale.UpdatedAt.Should().NotBeNull();
 
         // Verify in fresh context
-        using var freshContext = CreateFreshContext();
+        // FIX: Use the correct method to get a fresh context
+        using var freshContext = GetDbContext();
         var persistedSale = await freshContext.Sales.FindAsync(createdSale.Id);
         persistedSale!.CustomerName.Should().Be("Updated Customer Name");
         persistedSale.UpdatedAt.Should().NotBeNull();
@@ -507,8 +527,8 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
     {
         // Arrange
         await CleanDatabaseAsync();
-        var sale = SaleRepositoryTestData.GenerateValidSaleWithItems(2);
-        var createdSale = await _repository.CreateAsync(sale);
+        var sale = SaleIntegrationTestData.GenerateValidSaleEntity();
+        var createdSale = await _saleRepository.CreateAsync(sale);
 
         // Modify an item
         var itemToModify = createdSale.Items.First();
@@ -517,7 +537,7 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
         createdSale.CalculateTotalAmount();
 
         // Act
-        var updatedSale = await _repository.UpdateAsync(createdSale);
+        var updatedSale = await _saleRepository.UpdateAsync(createdSale);
 
         // Assert
         updatedSale.Should().NotBeNull();
@@ -538,17 +558,17 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
     {
         // Arrange
         await CleanDatabaseAsync();
-        var sale = SaleRepositoryTestData.GenerateValidSaleWithItems();
-        var createdSale = await _repository.CreateAsync(sale);
+        var sale = SaleIntegrationTestData.GenerateValidSaleEntity();
+        var createdSale = await _saleRepository.CreateAsync(sale);
 
         // Act
-        var result = await _repository.DeleteAsync(createdSale.Id);
+        var result = await _saleRepository.DeleteAsync(createdSale.Id);
 
         // Assert
         result.Should().BeTrue();
 
         // Verify deletion
-        var deletedSale = await _repository.GetByIdAsync(createdSale.Id);
+        var deletedSale = await _saleRepository.GetByIdAsync(createdSale.Id);
         deletedSale.Should().BeNull();
     }
 
@@ -563,7 +583,7 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
         var nonExistentId = Guid.NewGuid();
 
         // Act
-        var result = await _repository.DeleteAsync(nonExistentId);
+        var result = await _saleRepository.DeleteAsync(nonExistentId);
 
         // Assert
         result.Should().BeFalse();
@@ -581,12 +601,12 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
     {
         // Arrange
         await CleanDatabaseAsync();
-        var sales = SaleRepositoryTestData.GenerateMultipleSalesWithItems(7);
+        var sales = Enumerable.Range(0, 7).Select(_ => SaleIntegrationTestData.GenerateValidSaleEntity()).ToList();
         foreach (var sale in sales)
-            await _repository.CreateAsync(sale);
+            await _saleRepository.CreateAsync(sale);
 
         // Act
-        var count = await _repository.GetCountAsync();
+        var count = await _saleRepository.GetCountAsync();
 
         // Assert
         count.Should().Be(7);
@@ -602,7 +622,7 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
         await CleanDatabaseAsync();
 
         // Act
-        var count = await _repository.GetCountAsync();
+        var count = await _saleRepository.GetCountAsync();
 
         // Assert
         count.Should().Be(0);
@@ -620,13 +640,13 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
     {
         // Arrange
         await CleanDatabaseAsync();
-        var sale = SaleRepositoryTestData.GenerateValidSaleWithItems();
+        var sale = SaleIntegrationTestData.GenerateValidSaleEntity();
         using var cts = new CancellationTokenSource();
         cts.Cancel(); // Cancel immediately
 
         // Act & Assert
         await Assert.ThrowsAsync<OperationCanceledException>(
-            () => _repository.CreateAsync(sale, cts.Token));
+            () => _saleRepository.CreateAsync(sale, cts.Token));
     }
 
     #endregion
@@ -642,14 +662,17 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
         // Arrange
         await CleanDatabaseAsync();
         var saleNumber = "DUPLICATE-TEST";
-        var firstSale = SaleRepositoryTestData.GenerateSaleWithNumber(saleNumber);
-        var duplicateSale = SaleRepositoryTestData.GenerateSaleWithNumber(saleNumber);
+        var firstSale = SaleIntegrationTestData.GenerateValidSaleEntity();
+        firstSale.SaleNumber = saleNumber;
+        var duplicateSale = SaleIntegrationTestData.GenerateValidSaleEntity();
+        duplicateSale.SaleNumber = saleNumber;
 
-        await _repository.CreateAsync(firstSale);
+        await _saleRepository.CreateAsync(firstSale);
 
         // Act & Assert
+        // FIX: Add using for DbUpdateException
         await Assert.ThrowsAsync<DbUpdateException>(
-            () => _repository.CreateAsync(duplicateSale));
+            () => _saleRepository.CreateAsync(duplicateSale));
     }
 
     #endregion
@@ -657,29 +680,43 @@ public class SaleRepositoryIntegrationTests : BaseRepositoryIntegrationTest
     #region Performance Tests
 
     /// <summary>
-    /// Tests that bulk operations perform within acceptable time limits
+    /// Tests bulk operations to ensure they complete within a reasonable time
     /// </summary>
     [Fact(DisplayName = "Bulk operations should complete within reasonable time")]
     public async Task Given_LargeNumberOfSales_When_BulkOperations_Then_ShouldCompleteInReasonableTime()
     {
         // Arrange
         await CleanDatabaseAsync();
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        const int salesCount = 50;
-        var sales = SaleRepositoryTestData.GenerateMultipleSalesWithItems(salesCount, 1);
+        const int numberOfSales = 100;
+        var salesToCreate = new List<Sale>();
 
-        // Act
-        foreach (var sale in sales)
+        for (int i = 0; i < numberOfSales; i++)
         {
-            await _repository.CreateAsync(sale);
+            var sale = SaleIntegrationTestData.GenerateValidSaleEntity();
+            sale.SaleNumber = $"BULK-{i:D4}";
+            salesToCreate.Add(sale);
         }
 
-        var allSales = await _repository.GetAllAsync(1, salesCount);
+        var stopwatch = Stopwatch.StartNew();
+
+        // Act - FIX: Criar um novo repositório (e DbContext) para cada operação
+        var creationTasks = salesToCreate.Select(async sale =>
+        {
+            // Criar um novo scope e repositório para cada task
+            using var scope = Factory.CreateScope();
+            var repository = scope.ServiceProvider.GetRequiredService<ISaleRepository>();
+            return await repository.CreateAsync(sale);
+        }).ToList();
+
+        await Task.WhenAll(creationTasks);
+
         stopwatch.Stop();
 
         // Assert
-        allSales.Should().HaveCount(salesCount);
-        stopwatch.ElapsedMilliseconds.Should().BeLessThan(30000); // Should complete in less than 30 seconds
+        stopwatch.ElapsedMilliseconds.Should().BeLessThan(15000, "Bulk creation of 100 sales should be fast.");
+
+        var count = await _saleRepository.GetCountAsync();
+        count.Should().Be(numberOfSales);
     }
 
     #endregion

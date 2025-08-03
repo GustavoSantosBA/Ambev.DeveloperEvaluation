@@ -17,6 +17,7 @@ public abstract class BaseIntegrationTest : IClassFixture<IntegrationTestWebAppF
     {
         Factory = factory;
         HttpClient = factory.CreateClient();
+        //HttpClient.BaseAddress = new Uri("https://localhost:7181"); // Adjust as needed
     }
 
     /// <summary>

@@ -44,6 +44,12 @@ public class GetSaleHandler : IRequestHandler<GetSaleQuery, GetSaleResult>
         if (sale == null)
             throw new KeyNotFoundException($"Sale with ID {request.Id} not found");
 
-        return _mapper.Map<GetSaleResult>(sale);
+        System.Diagnostics.Debug.WriteLine($"DEBUG Handler: Sale from repo - ID: {sale.Id}, SaleNumber: '{sale.SaleNumber}'");
+
+        var result = _mapper.Map<GetSaleResult>(sale);
+        
+        System.Diagnostics.Debug.WriteLine($"DEBUG Handler: Mapped result - ID: {result.Id}, SaleNumber: '{result.SaleNumber}'");
+
+        return result;
     }
 }
